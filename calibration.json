@@ -1,0 +1,156 @@
+{
+  "generated_utc": "2026-07-26T14:04:14+00:00",
+  "source": "data/scored.parquet",
+  "window": {
+    "start": "2026-03-26",
+    "end": "2026-07-25",
+    "split_date": "2026-06-05"
+  },
+  "sample": {
+    "matchups": 27830,
+    "pa": 67836,
+    "hr": 2190,
+    "hr_per_pa_pct": 3.228374314523262,
+    "confident_matchups": 11193,
+    "min_bat_bbe": 80,
+    "min_pit": 150
+  },
+  "zone_fit": {
+    "k_grid": [
+      10,
+      25,
+      50,
+      100,
+      200
+    ],
+    "k_star": 25,
+    "train_lift_hrpa_pp": -0.15318812313717456,
+    "test_lift_hrpa_pp": 0.5237007495107386,
+    "null_band": {
+      "n": 200,
+      "mean": -0.0028247362078830606,
+      "sd": 0.3233464305870492,
+      "p05": -0.5000740734433253,
+      "p95": 0.5344446276134668
+    },
+    "beats_noise": false,
+    "index_percentiles": {
+      "p10": 93.92191061181839,
+      "p25": 97.14874218856576,
+      "p50": 99.9511833658199,
+      "p75": 102.66582835891384,
+      "p90": 105.55054745621406
+    },
+    "verdict": "no measurable marginal edge \u2014 do not weight it"
+  },
+  "gates": {
+    "hh_pct": [
+      {
+        "threshold": 34,
+        "hrpa_pass": 5.147759771210677,
+        "hrpa_fail": 3.4334453720770535,
+        "edge": 1.7143143991336238,
+        "pa_kept_pct": 3.6527613343547602,
+        "n_pass": 384
+      },
+      {
+        "threshold": 36,
+        "hrpa_pass": 5.066666666666666,
+        "hrpa_fail": 3.475284902797869,
+        "edge": 1.5913817638687973,
+        "pa_kept_pct": 1.3058012396406435,
+        "n_pass": 136
+      },
+      {
+        "threshold": 38,
+        "hrpa_pass": 6.25,
+        "hrpa_fail": 3.485282807802559,
+        "edge": 2.764717192197441,
+        "pa_kept_pct": 0.3899993035726722,
+        "n_pass": 41
+      },
+      {
+        "threshold": 40,
+        "hrpa_pass": 8.108108108108109,
+        "hrpa_fail": 3.490115407412573,
+        "edge": 4.617992700695536,
+        "pa_kept_pct": 0.1288390556445435,
+        "n_pass": 14
+      },
+      {
+        "threshold": 42,
+        "hrpa_pass": 33.33333333333333,
+        "hrpa_fail": 3.492947936618492,
+        "edge": 29.840385396714836,
+        "pa_kept_pct": 0.010446409917125147,
+        "n_pass": 1
+      },
+      {
+        "threshold": 44,
+        "hrpa_pass": NaN,
+        "hrpa_fail": 3.496065185597883,
+        "edge": NaN,
+        "pa_kept_pct": 0.0,
+        "n_pass": 0
+      },
+      {
+        "threshold": 46,
+        "hrpa_pass": NaN,
+        "hrpa_fail": 3.496065185597883,
+        "edge": NaN,
+        "pa_kept_pct": 0.0,
+        "n_pass": 0
+      }
+    ],
+    "brl_pct": [
+      {
+        "threshold": 6,
+        "hrpa_pass": 4.736695458344943,
+        "hrpa_fail": 3.0826369545032497,
+        "edge": 1.6540585038416937,
+        "pa_kept_pct": 24.99477679504144,
+        "n_pass": 2680
+      },
+      {
+        "threshold": 8,
+        "hrpa_pass": 5.728314238952537,
+        "hrpa_fail": 3.288422014158484,
+        "edge": 2.439892224794053,
+        "pa_kept_pct": 8.510341945817954,
+        "n_pass": 894
+      },
+      {
+        "threshold": 10,
+        "hrpa_pass": 6.412478336221837,
+        "hrpa_fail": 3.4362673678973743,
+        "edge": 2.976210968324463,
+        "pa_kept_pct": 2.0091928407270703,
+        "n_pass": 210
+      },
+      {
+        "threshold": 12,
+        "hrpa_pass": 7.8431372549019605,
+        "hrpa_fail": 3.4727813758095567,
+        "edge": 4.370355879092404,
+        "pa_kept_pct": 0.5327669057733826,
+        "n_pass": 55
+      },
+      {
+        "threshold": 14,
+        "hrpa_pass": 8.333333333333332,
+        "hrpa_fail": 3.4920192374712484,
+        "edge": 4.841314095862083,
+        "pa_kept_pct": 0.08357127933700118,
+        "n_pass": 9
+      },
+      {
+        "threshold": 16,
+        "hrpa_pass": NaN,
+        "hrpa_fail": 3.496065185597883,
+        "edge": NaN,
+        "pa_kept_pct": 0.0,
+        "n_pass": 0
+      }
+    ]
+  }
+}
