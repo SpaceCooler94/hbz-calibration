@@ -224,9 +224,23 @@ def pitcher_zone_cum(p: pd.DataFrame) -> pd.DataFrame:
 
 
 def _asof(left: pd.DataFrame, right: pd.DataFrame, by: list[str]) -> pd.DataFrame:
-    """As-of join on game_date, strictly before. This is the leakage guard."""
-    l = left.sort_values("game_date")
-    r = right.sort_values("game_date")
+    """As-of join on game_date, strictly before. This is the leakage guard.
+
+    Normalises the join keys on both sides first. The backfill path carries
+    ids as int32 (from the parquet cache's dtype cast) while the daily path's
+    matchups arrive as int64 from StatsAPI; merge_asof refuses to join int32
+    against int64, so every by-key is coerced to one type before the merge.
+    """
+    l = left.sort_values("game_date").copy()
+    r = right.sort_values("game_date").copy()
+    for k in by:
+        for d in (l, r):
+            if k not in d.columns:
+                continue
+            if pd.api.types.is_integer_dtype(d[k]):
+                d[k] = d[k].astype("int64")
+            elif isinstance(d[k].dtype, pd.CategoricalDtype) or d[k].dtype == object:
+                d[k] = d[k].astype(str)
     return pd.merge_asof(
         l, r, on="game_date", by=by,
         direction="backward", allow_exact_matches=False,
