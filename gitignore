@@ -1,0 +1,4 @@
+data/raw/
+data/scored.parquet
+__pycache__/
+*.pyc
