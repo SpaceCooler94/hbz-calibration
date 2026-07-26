@@ -1,0 +1,82 @@
+name: calibrate
+
+# Reconstruct the season and grade Zone Fit + the gates against outcomes.
+#   - manual (workflow_dispatch): the FIRST full run, and any ad-hoc re-run.
+#     Pass start/end, or leave blank for SEASON_START .. yesterday.
+#   - weekly (schedule): keeps calibration.json fresh as the season fills in.
+# Cached pitch days make every run after the first one cheap. Free on public.
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "season start (YYYY-MM-DD) — blank = SEASON_START"
+        required: false
+        default: ""
+      end:
+        description: "through (YYYY-MM-DD) — blank = yesterday"
+        required: false
+        default: ""
+  schedule:
+    - cron: "40 15 * * 1"       # Mondays, after the daily job
+
+permissions:
+  contents: write
+
+env:
+  SEASON_START: "2026-03-26"    # keep in step with daily.yml
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: statcast-raw-${{ github.run_id }}
+          restore-keys: statcast-raw-
+
+      # The leakage guard runs before anything is graded. If it fails, the
+      # calibration numbers are meaningless, so the job stops here.
+      - name: Leakage + math tests
+        run: python3 test_leakage.py
+
+      - name: Resolve window
+        id: win
+        run: |
+          START="${{ inputs.start }}"; [ -z "$START" ] && START="$SEASON_START"
+          END="${{ inputs.end }}";     [ -z "$END" ]   && END="$(date -u -d 'yesterday' +%F)"
+          echo "start=$START" >> "$GITHUB_OUTPUT"
+          echo "end=$END"     >> "$GITHUB_OUTPUT"
+          echo "Window $START .. $END"
+
+      - name: Backfill
+        run: python3 backfill.py --start "${{ steps.win.outputs.start }}" --end "${{ steps.win.outputs.end }}"
+
+      - name: Calibrate
+        run: python3 calibrate.py
+
+      # calibration.json + report.md committed to the repo root so the board
+      # can fetch the raw URL. report.md is the thing to read before trusting.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: calibration
+          path: |
+            calibration.json
+            report.md
+
+      - name: Commit results
+        run: |
+          git config user.name  "hbz-bot"
+          git config user.email "hbz-bot@users.noreply.github.com"
+          git add calibration.json report.md
+          git diff --staged --quiet || git commit -m "calibrate: $(date -u +%F)"
+          git push
