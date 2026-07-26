@@ -1,0 +1,42 @@
+# Render Blueprint — the scheduler half of the project.
+# GitHub holds the code and the state (agg/, snapshots/, ledger.csv,
+# calibration.json). Render runs two cron jobs that clone the repo, do the
+# work, and commit the results back. Cron jobs are ephemeral and have no
+# disk, which is exactly why state lives in git rather than on Render.
+#
+# autoDeploy is off on both: these jobs push data commits to main, and a
+# redeploy-on-every-commit would loop. Pick up code changes with a manual
+# deploy from the Render dashboard.
+
+services:
+  - type: cron
+    name: hbz-daily
+    runtime: python
+    schedule: "10 15 * * *"        # 11:10 ET — after the prior night settles (UTC)
+    branch: main
+    autoDeploy: false
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash render_run.sh daily
+    envVars:
+      - key: GH_PAT               # fine-grained PAT, Contents: read+write
+        sync: false               #   -> set in the Render dashboard, never committed
+      - key: GH_REPO              # e.g. yourname/hbz-calibration
+        sync: false
+      - key: SEASON_START
+        value: "2026-03-26"
+
+  - type: cron
+    name: hbz-calibrate
+    runtime: python
+    schedule: "40 15 * * 1"        # Mondays, after the daily job
+    branch: main
+    autoDeploy: false
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash render_run.sh calibrate
+    envVars:
+      - key: GH_PAT
+        sync: false
+      - key: GH_REPO
+        sync: false
+      - key: SEASON_START
+        value: "2026-03-26"
