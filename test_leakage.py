@@ -126,9 +126,35 @@ def test_outcomes():
     print(f"  outcomes   OK   pa {r['pa']}  hr {r['hr']}  starter {r['starter']}")
 
 
+def test_dtype_bridge():
+    """The daily path feeds int32 grids (parquet cache) and an int64 slate
+    (StatsAPI). The as-of join must bridge them instead of raising."""
+    rows, ab = [], 0
+    for d in ["2026-03-25", "2026-03-26"]:
+        for i in range(40):
+            ab += 1
+            rows.append(pitch(d, 1, ab, 1, 100 + i % 5, 900, "R", (i % 9) + 1,
+                              la=25 if i % 3 == 0 else 8,
+                              lsa=6 if i % 3 == 0 else 2,
+                              ev=104 if i % 3 == 0 else 85, events="single"))
+    df = pd.DataFrame(rows)
+    for c, t in C.DTYPES.items():          # mimic the parquet cache's int32 cast
+        if c in df:
+            df[c] = df[c].astype(t, errors="ignore")
+    cum = C.cum_from_agg(C.aggregate_day(C.annotate(df)))
+    mu = pd.DataFrame([dict(game_date=pd.Timestamp("2026-03-27"), batter=100,
+                            starter=900, stand="R", pa=np.nan, hr=np.nan, bbe=np.nan)])
+    out = C.score_zone_fit(mu, cum["bat_zone"], cum["bat_base"], cum["pit_zone"], [50])
+    out = C.attach_control(out, cum["bat_rate"])
+    assert out["zf_index_k50"].notna().iat[0], "daily path failed to score"
+    print("  dtypes     OK   int32 grid x int64 slate joined, index %.1f"
+          % out["zf_index_k50"].iat[0])
+
+
 if __name__ == "__main__":
     print("hbz_core smoke tests")
     test_leakage()
     test_math()
     test_outcomes()
+    test_dtype_bridge()
     print("all passed")
