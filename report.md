@@ -1,9 +1,9 @@
 # HHBarrelZone calibration
 
-Window **2026-03-26 .. 2026-07-25**, split at **2026-06-05** (first 60% of game dates trains, last 40% reports).
+Window **2026-03-26 .. 2026-07-26**, split at **2026-06-06** (first 60% of game dates trains, last 40% reports).
 
-- matchups **27,830** · PA **67,836** · HR **2,190** · base HR/PA **3.23%**
-- confident rows (bat in-zone BBE ≥ 80, pitcher in-zone pitches ≥ 150): **11,193**
+- matchups **28,102** · PA **68,468** · HR **2,212** · base HR/PA **3.23%**
+- confident rows (bat in-zone BBE ≥ 80, pitcher in-zone pitches ≥ 150): **11,416**
 
 ## 1. Does Zone Fit add anything to barrel rate?
 
@@ -13,11 +13,11 @@ Lift = (HR/PA in the top Zone Fit bin) − (bottom bin), measured *within* barre
 
 |   k |   train_lift |
 |----:|-------------:|
-|  10 |       -0.232 |
-|  25 |       -0.153 |
-|  50 |       -0.565 |
-| 100 |       -0.593 |
-| 200 |       -0.383 |
+|  10 |       -0.346 |
+|  25 |       -0.18  |
+|  50 |       -0.545 |
+| 100 |       -0.601 |
+| 200 |       -0.432 |
 
 Chosen **k = 25**.
 
@@ -25,23 +25,23 @@ Chosen **k = 25**.
 
 |   stratum |   brl_lo |   brl_hi |   pa |   hrpa_zf_low |   hrpa_zf_high |   lift |
 |----------:|---------:|---------:|-----:|--------------:|---------------:|-------:|
-|         0 |    0.179 |    2.529 | 3615 |         2.748 |          2.912 |  0.164 |
-|         1 |    2.532 |    3.662 | 3779 |         2.752 |          3.662 |  0.911 |
-|         2 |    3.665 |    4.73  | 3875 |         2.791 |          3.849 |  1.058 |
-|         3 |    4.732 |    6.28  | 3848 |         5.3   |          4.114 | -1.186 |
-|         4 |    6.281 |   15.044 | 4027 |         4.201 |          5.804 |  1.603 |
+|         0 |    0.179 |    2.532 | 3644 |         2.558 |          2.975 |  0.417 |
+|         1 |    2.534 |    3.659 | 3808 |         2.81  |          3.639 |  0.829 |
+|         2 |    3.662 |    4.732 | 3898 |         2.628 |          3.755 |  1.127 |
+|         3 |    4.734 |    6.272 | 3882 |         5.093 |          4.173 | -0.919 |
+|         4 |    6.275 |   15.044 | 4055 |         4.086 |          5.865 |  1.779 |
 
-Pooled test lift: **+0.524 pp**
+Pooled test lift: **+0.659 pp**
 
-Permutation null (200 seeded shuffles within stratum): mean -0.003, 5-95% band **[-0.500, +0.534]** pp.
+Permutation null (200 seeded shuffles within stratum): mean -0.001, 5-95% band **[-0.529, +0.566]** pp.
 
-**Measured lift sits inside the noise band.** On this sample Zone Fit is not distinguishable from a shuffled column — it should not move a price.
+**Measured lift clears the noise band.** Zone Fit carries marginal information at k=25.
 
 ### Observed index distribution
 
-|    p10 |    p25 |    p50 |     p75 |     p90 |
-|-------:|-------:|-------:|--------:|--------:|
-| 93.922 | 97.149 | 99.951 | 102.666 | 105.551 |
+|   p10 |   p25 |   p50 |    p75 |     p90 |
+|------:|------:|------:|-------:|--------:|
+| 93.91 | 97.13 | 99.95 | 102.67 | 105.579 |
 
 Use these percentiles for the board's colour bands instead of hand-picked 95/105/115 cutpoints.
 
@@ -53,24 +53,24 @@ Use these percentiles for the board's colour bands instead of hand-picked 95/105
 
 |   threshold |   hrpa_pass |   hrpa_fail |    edge |   pa_kept_pct |   n_pass |
 |------------:|------------:|------------:|--------:|--------------:|---------:|
-|          34 |       5.148 |       3.433 |   1.714 |         3.653 |      384 |
-|          36 |       5.067 |       3.475 |   1.591 |         1.306 |      136 |
-|          38 |       6.25  |       3.485 |   2.765 |         0.39  |       41 |
-|          40 |       8.108 |       3.49  |   4.618 |         0.129 |       14 |
-|          42 |      33.333 |       3.493 |  29.84  |         0.01  |        1 |
-|          44 |     nan     |       3.496 | nan     |         0     |        0 |
-|          46 |     nan     |       3.496 | nan     |         0     |        0 |
+|          34 |       5.118 |       3.424 |   1.695 |         3.608 |      386 |
+|          36 |       5.067 |       3.464 |   1.602 |         1.282 |      136 |
+|          38 |       6.25  |       3.474 |   2.776 |         0.383 |       41 |
+|          40 |       8.108 |       3.479 |   4.629 |         0.127 |       14 |
+|          42 |      33.333 |       3.482 |  29.852 |         0.01  |        1 |
+|          44 |     nan     |       3.485 | nan     |         0     |        0 |
+|          46 |     nan     |       3.485 | nan     |         0     |        0 |
 
 ### Barrel%
 
 |   threshold |   hrpa_pass |   hrpa_fail |    edge |   pa_kept_pct |   n_pass |
 |------------:|------------:|------------:|--------:|--------------:|---------:|
-|           6 |       4.737 |       3.083 |   1.654 |        24.995 |     2680 |
-|           8 |       5.728 |       3.288 |   2.44  |         8.51  |      894 |
-|          10 |       6.412 |       3.436 |   2.976 |         2.009 |      210 |
-|          12 |       7.843 |       3.473 |   4.37  |         0.533 |       55 |
-|          14 |       8.333 |       3.492 |   4.841 |         0.084 |        9 |
-|          16 |     nan     |       3.496 | nan     |         0     |        0 |
+|           6 |       4.708 |       3.079 |   1.629 |        24.914 |     2725 |
+|           8 |       5.74  |       3.276 |   2.463 |         8.461 |      907 |
+|          10 |       6.563 |       3.423 |   3.14  |         1.98  |      211 |
+|          12 |       8.387 |       3.459 |   4.928 |         0.53  |       56 |
+|          14 |       8.333 |       3.481 |   4.852 |         0.082 |        9 |
+|          16 |     nan     |       3.485 | nan     |         0     |        0 |
 
 ---
 
