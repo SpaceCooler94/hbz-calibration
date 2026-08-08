@@ -47,11 +47,21 @@ BARREL_LSA = 6
 SEARCH_URL = "https://baseballsavant.mlb.com/statcast_search/csv"
 UA = "Mozilla/5.0 (compatible; HHBarrelZone-calibration/1.0)"
 
+# Pitch-type vocabulary for the SP-target-barrel feature. Fixed so each
+# matchup explodes to the same columns (like the nine zones for Zone Fit).
+# Codes a pitcher never throws get usage 0 and drop out; ~99% of pitches
+# fall in this set, the long tail (EP, PO, etc.) is not worth a column.
+PITCH_TYPES = ["FF", "SI", "FC", "SL", "ST", "CU", "KC", "CS",
+               "CH", "FS", "FO", "SV", "SC", "KN"]
+SPT_KB = 60          # batter per-pitch barrel shrink, toward his own base
+SPT_KP = 40          # pitcher barrel-allowed shrink, toward league
+SPT_LEAGUE = 0.075   # league barrel per BBE — the shrink target / fallback
+
 # Columns kept from the raw pitch feed. Everything else is dropped at
 # parse time — a season of all 90-odd Savant columns is a needless 2 GB.
 KEEP = [
     "game_date", "game_pk", "at_bat_number", "pitch_number",
-    "batter", "pitcher", "stand", "p_throws", "zone",
+    "batter", "pitcher", "stand", "p_throws", "zone", "pitch_type",
     "launch_speed", "launch_angle", "launch_speed_angle",
     "hc_x", "hc_y", "events", "description", "inning_topbot",
 ]
@@ -93,7 +103,11 @@ def fetch_day(day: str, cache_dir: str = "data/raw", sleep: float = 1.0,
     os.makedirs(cache_dir, exist_ok=True)
     path = os.path.join(cache_dir, f"{day}.parquet")
     if os.path.exists(path):
-        return pd.read_parquet(path)
+        cached = pd.read_parquet(path)
+        # A day cached before pitch_type was tracked is re-fetched so the
+        # SP-target feature has history. One refetch per stale day, once.
+        if "pitch_type" not in KEEP or "pitch_type" in cached.columns:
+            return cached
 
     last = None
     for attempt in range(retries):
@@ -221,6 +235,53 @@ def pitcher_zone_cum(p: pd.DataFrame) -> pd.DataFrame:
     d["p_cum"] = d.groupby(["pitcher", "stand", "zone"], observed=True)["n"].cumsum()
     d["zone"] = d["zone"].astype("float64")
     return d[["pitcher", "stand", "zone", "game_date", "p_cum"]]
+
+
+# ── per-pitch-type grids (for SP-target-barrel) ──────────────────────
+# Same cumsum + as-of shape as the zone grids, keyed on pitch_type
+# instead of zone. Batter damage is over ALL his BBE off a pitch type
+# (not just in-zone); pitcher vulnerability is barrels allowed per BBE
+# on that pitch type, plus its usage share.
+
+def batter_pitch_cum(p: pd.DataFrame) -> pd.DataFrame:
+    """Cumulative BBE and barrels per (batter, pitch_type), by date."""
+    cols = ["batter", "pitch_type", "game_date", "bn_cum", "bb_cum"]
+    if "pitch_type" not in p.columns:
+        return pd.DataFrame(columns=cols)
+    bbe = p[p["is_bbe"] & p["pitch_type"].notna()]
+    if bbe.empty:
+        return pd.DataFrame(columns=cols)
+    d = (bbe.groupby(["batter", "pitch_type", "game_date"], observed=True)
+            .agg(n=("is_bbe", "sum"), b=("is_brl", "sum"))
+            .reset_index()
+            .sort_values("game_date"))
+    d[["bn_cum", "bb_cum"]] = (
+        d.groupby(["batter", "pitch_type"], observed=True)[["n", "b"]].cumsum())
+    d["pitch_type"] = d["pitch_type"].astype(str)
+    return d[cols]
+
+
+def pitcher_pitch_cum(p: pd.DataFrame) -> pd.DataFrame:
+    """Cumulative usage, BBE-allowed and barrels-allowed per
+    (pitcher, batter stance, pitch_type), by date."""
+    cols = ["pitcher", "stand", "pitch_type", "game_date",
+            "pit_n_cum", "pit_bbe_cum", "pit_brl_cum"]
+    if "pitch_type" not in p.columns:
+        return pd.DataFrame(columns=cols)
+    pp = p[p["pitch_type"].notna()].copy()
+    if pp.empty:
+        return pd.DataFrame(columns=cols)
+    pp["stand"] = pp["stand"].astype(str)
+    d = (pp.groupby(["pitcher", "stand", "pitch_type", "game_date"], observed=True)
+           .agg(n=("is_bbe", "size"),      # every pitch of the type — usage
+                bbe=("is_bbe", "sum"),     # batted balls allowed
+                brl=("is_brl", "sum"))     # barrels allowed
+           .reset_index()
+           .sort_values("game_date"))
+    d[["pit_n_cum", "pit_bbe_cum", "pit_brl_cum"]] = (
+        d.groupby(["pitcher", "stand", "pitch_type"], observed=True)[["n", "bbe", "brl"]].cumsum())
+    d["pitch_type"] = d["pitch_type"].astype(str)
+    return d[cols]
 
 
 def _asof(left: pd.DataFrame, right: pd.DataFrame, by: list[str]) -> pd.DataFrame:
@@ -357,9 +418,95 @@ def attach_control(mu: pd.DataFrame, rc: pd.DataFrame) -> pd.DataFrame:
 def build_scored(p: pd.DataFrame, k_values: list[int]) -> pd.DataFrame:
     """Full pipeline: annotated pitches -> scored, outcome-bearing matchups."""
     mu = matchups(p)
+    rc = batter_rate_cum(p)
     scored = score_zone_fit(mu, batter_zone_cum(p), batter_base_cum(p),
                             pitcher_zone_cum(p), k_values)
-    return attach_control(scored, batter_rate_cum(p))
+    scored = score_sp_target(scored, batter_pitch_cum(p), pitcher_pitch_cum(p), rc)
+    return attach_control(scored, rc)
+
+
+# ── SP-target-barrel ─────────────────────────────────────────────────
+def score_sp_target(mu: pd.DataFrame, bp: pd.DataFrame, pp: pd.DataFrame,
+                    rc: pd.DataFrame, kb: int = SPT_KB, kp: int = SPT_KP,
+                    league: float = SPT_LEAGUE) -> pd.DataFrame:
+    """The hitter's barrel rate on the pitches this starter is vulnerable
+    to, weighted by usage x barrel-allowed. Mirrors the SPTargets board,
+    graded here instead of displayed.
+
+    Every input is as-of strictly before the game date — the same leakage
+    guard as Zone Fit. Weighting is smooth over the whole arsenal; the
+    board's top-4 cut is a display choice, not part of the number, so
+    there is no discrete knob to tune in the graded feature.
+
+    Adds:
+      spt_barrel  expected barrel% on his vulnerability-weighted pitch mix
+      spt_index   spt_barrel / batter's own barrel base * 100 (the tilt)
+      spt_cov     % of the SP's usage on pitches the batter has sample for
+      spt_batn    batter BBE summed across the arsenal, as of the date
+      spt_p0b     batter overall barrel base (per BBE) as of the date
+    """
+    out = mu.copy().reset_index(drop=True)
+    for c in ["spt_barrel", "spt_index", "spt_cov", "spt_batn", "spt_p0b"]:
+        out[c] = np.nan
+    if bp is None or pp is None or len(bp) == 0 or len(pp) == 0:
+        return out
+
+    m = out[["game_date", "batter", "starter", "stand"]].copy()
+    m["game_date"] = pd.to_datetime(m["game_date"])
+    m["stand"] = m["stand"].astype(str)
+
+    # batter overall barrel base (all BBE) as of the date — the shrink target
+    base = _asof(m.copy(), rc, by=["batter"])
+    bbe0 = base["bbe_cum"].fillna(0).to_numpy()
+    brl0 = base["brl_cum"].fillna(0).to_numpy()
+    p0b = np.where(bbe0 > 0, brl0 / np.where(bbe0 > 0, bbe0, 1), league)
+
+    # explode to the pitch-type vocabulary
+    cells = m.copy()
+    cells["_row"] = np.arange(len(cells))
+    cells = cells.loc[cells.index.repeat(len(PITCH_TYPES))].copy()
+    cells["pitch_type"] = np.tile(PITCH_TYPES, len(m))
+
+    cells = _asof(cells, pp.rename(columns={"pitcher": "starter"}),
+                  by=["starter", "stand", "pitch_type"])
+    for c in ["pit_n_cum", "pit_bbe_cum", "pit_brl_cum"]:
+        cells[c] = cells[c].fillna(0)
+    cells = _asof(cells, bp, by=["batter", "pitch_type"])
+    for c in ["bn_cum", "bb_cum"]:
+        cells[c] = cells[c].fillna(0)
+
+    tot = cells.groupby("_row", observed=True)["pit_n_cum"].transform("sum").to_numpy()
+    pit_n = cells["pit_n_cum"].to_numpy()
+    usage = np.where(tot > 0, pit_n / np.where(tot > 0, tot, 1), 0.0)
+
+    # pitcher barrel-allowed per pitch, shrunk toward league
+    brl_allow = (cells["pit_brl_cum"].to_numpy() + kp * league) / (cells["pit_bbe_cum"].to_numpy() + kp)
+    w = usage * brl_allow
+
+    # batter barrel per pitch, shrunk toward his own base
+    p0b_row = p0b[cells["_row"].to_numpy()]
+    b_p = (cells["bb_cum"].to_numpy() + kb * p0b_row) / (cells["bn_cum"].to_numpy() + kb)
+
+    cells["_w"] = w
+    cells["_wb"] = w * b_p
+    cells["_covw"] = np.where(cells["bn_cum"].to_numpy() > 0, usage, 0.0)
+    cells["_batn"] = cells["bn_cum"].to_numpy()
+
+    g = cells.groupby("_row", observed=True)
+    idx = np.arange(len(m))
+    wsum = g["_w"].sum().reindex(idx, fill_value=0).to_numpy()
+    wbsum = g["_wb"].sum().reindex(idx, fill_value=0).to_numpy()
+    cov = g["_covw"].sum().reindex(idx, fill_value=0).to_numpy()
+    batn = g["_batn"].sum().reindex(idx, fill_value=0).to_numpy()
+
+    score = np.where(wsum > 0, wbsum / np.where(wsum > 0, wsum, 1), np.nan)
+    out["spt_barrel"] = score * 100
+    out["spt_p0b"] = p0b
+    out["spt_index"] = np.where((p0b > 0) & np.isfinite(score),
+                                score / np.where(p0b > 0, p0b, 1) * 100, np.nan)
+    out["spt_cov"] = cov * 100
+    out["spt_batn"] = batn
+    return out
 
 
 # ── compact daily aggregates (for the forward collector) ─────────────
