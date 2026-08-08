@@ -17,9 +17,10 @@ import hbz_core as C
 
 
 def pitch(dt, gpk, ab, pn, bat, pit, stand, zone, la=None, lsa=None,
-          ev=None, events=None, topbot="Top"):
+          ev=None, events=None, topbot="Top", pitch_type="FF"):
     return dict(game_date=dt, game_pk=gpk, at_bat_number=ab, pitch_number=pn,
                 batter=bat, pitcher=pit, stand=stand, p_throws="R", zone=zone,
+                pitch_type=pitch_type,
                 launch_speed=ev, launch_angle=la, launch_speed_angle=lsa,
                 hc_x=None, hc_y=None, events=events, description="x",
                 inning_topbot=topbot)
@@ -65,7 +66,13 @@ def test_leakage():
     assert np.isclose(a, b), f"LEAKAGE: same-day barrels changed the score ({a} vs {b})"
     n1 = day[day["batter"] == 2]["bat_n"].iat[0]
     assert n1 == 60, f"prior in-zone BBE should be 60, got {n1}"
-    print(f"  leakage    OK   both batters index {a:.2f}, prior BBE {n1:.0f}")
+    # SP-target-barrel rides the same as-of guard: batter 2's same-day
+    # barrels must not reach his pitch-type grid either.
+    sa = day[day["batter"] == 1]["spt_index"].iat[0]
+    sb = day[day["batter"] == 2]["spt_index"].iat[0]
+    assert np.isfinite(sa) and np.isfinite(sb), f"spt did not score ({sa}, {sb})"
+    assert np.isclose(sa, sb), f"SPT LEAKAGE: same-day barrels changed spt ({sa} vs {sb})"
+    print(f"  leakage    OK   both batters index {a:.2f}, prior BBE {n1:.0f}; spt {sa:.1f}")
 
 
 def test_math():
