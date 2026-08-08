@@ -34,6 +34,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
+import hbz_core as C
+
 N_DECILES = 5          # barrel-rate strata. 5 keeps cells populated.
 N_ZF_BINS = 3          # Zone Fit bins within each stratum.
 N_PERM = 200
@@ -142,6 +144,7 @@ def main() -> None:
     ap.add_argument("--out-report", default="report.md")
     ap.add_argument("--min-bat-bbe", type=int, default=80)
     ap.add_argument("--min-pit", type=int, default=150)
+    ap.add_argument("--min-spt-cov", type=float, default=40.0)
     args = ap.parse_args()
 
     df = pd.read_parquet(args.scored)
@@ -173,6 +176,34 @@ def main() -> None:
     null = perm_floor(test, zf)
 
     passes = bool(null and np.isfinite(test_lift) and test_lift > null.get("p95", np.inf))
+
+    # ── SP-target-barrel: same honest test, fixed shrink (no k sweep) ──
+    # Does the hitter's barrel rate on the pitches this starter is
+    # vulnerable to beat his overall barrel rate, within a barrel stratum?
+    spt = None
+    if "spt_index" in df.columns and df["spt_index"].notna().any():
+        cs = df[(df["spt_batn"] >= args.min_bat_bbe) & (df["spt_cov"] >= args.min_spt_cov)].copy()
+        cs_tr, cs_te = cs[cs["game_date"] < cut], cs[cs["game_date"] >= cut]
+        spt_train, _ = within_lift(cs_tr, "spt_index")
+        spt_test, spt_tbl = within_lift(cs_te, "spt_index")
+        spt_null = perm_floor(cs_te, "spt_index")
+        spt_pass = bool(spt_null and np.isfinite(spt_test)
+                        and spt_test > spt_null.get("p95", np.inf))
+        sq = cs["spt_index"].dropna()
+        spt_bands = {f"p{p}": float(np.percentile(sq, p)) for p in (10, 25, 50, 75, 90)} if len(sq) else {}
+        spt = {
+            "feature": "spt_index",
+            "shrink": {"batter_k": C.SPT_KB, "pitcher_k": C.SPT_KP, "league_brl": C.SPT_LEAGUE},
+            "confident_matchups": int(len(cs)),
+            "min_bat_bbe": args.min_bat_bbe, "min_cov_pct": args.min_spt_cov,
+            "train_lift_hrpa_pp": spt_train,
+            "test_lift_hrpa_pp": spt_test,
+            "null_band": spt_null,
+            "beats_noise": spt_pass,
+            "index_percentiles": spt_bands,
+            "verdict": ("carries marginal HR signal beyond barrel rate" if spt_pass else
+                        "no measurable marginal edge — do not weight it"),
+        }
 
     # Observed index distribution -> band cutpoints, so the board's colour
     # bands are percentiles of what actually occurs rather than 95/105/115
@@ -207,6 +238,8 @@ def main() -> None:
         },
         "gates": {k: v.to_dict(orient="records") for k, v in gates.items()},
     }
+    if spt is not None:
+        payload["sp_target"] = spt
     with open(args.out_json, "w") as f:
         json.dump(payload, f, indent=2, default=float)
 
@@ -283,7 +316,50 @@ def main() -> None:
     with open(args.out_report, "w") as f:
         f.write("\n".join(lines))
 
+    if spt is not None:
+        spt_lines = [
+            "## 1b. Does SP-target-barrel add anything to barrel rate?",
+            "",
+            "Same test as Zone Fit: lift of the top vs bottom SP-target bin, "
+            "within barrel strata, PA-weighted. The feature is the hitter's "
+            "barrel rate on this starter's vulnerable pitches (usage × "
+            "barrel-allowed), as a tilt off his own barrel base.",
+            "",
+            f"Confident rows (batter arsenal BBE ≥ {args.min_bat_bbe}, "
+            f"coverage ≥ {args.min_spt_cov:.0f}%): **{spt['confident_matchups']:,}** · "
+            f"shrink batter k={C.SPT_KB}, pitcher k={C.SPT_KP}.",
+            "",
+            fmt(spt_tbl),
+            f"Train lift **{spt['train_lift_hrpa_pp']:+.3f} pp** · "
+            f"pooled test lift **{spt['test_lift_hrpa_pp']:+.3f} pp**.",
+            "",
+        ]
+        if spt["null_band"]:
+            nb = spt["null_band"]
+            spt_lines += [
+                f"Permutation null ({nb['n']} seeded shuffles): "
+                f"5-95% band **[{nb['p05']:+.3f}, {nb['p95']:+.3f}]** pp.",
+                "",
+                ("**Clears the noise band** — SP-target-barrel carries HR "
+                 "signal beyond barrel rate. This is the one that could earn a "
+                 "weight; watch it hold across weekly recalibrations before you "
+                 "trust it."
+                 if spt["beats_noise"] else
+                 "**Inside the noise band.** On this sample the SP-target read "
+                 "is not distinguishable from a shuffled column — the screener "
+                 "is useful for finding candidates, but the specific number "
+                 "does not beat barrel rate and should not move a price."),
+                "",
+            ]
+        anchor = lines.index("---")
+        lines[anchor:anchor] = spt_lines
+        with open(args.out_report, "w") as f:
+            f.write("\n".join(lines))
+
     print(f"k* = {k_star}   train {train_lift:+.3f} pp   test {test_lift:+.3f} pp")
+    if spt is not None:
+        print(f"sp-target   test {spt['test_lift_hrpa_pp']:+.3f} pp   "
+              f"-> {'BEATS NOISE' if spt['beats_noise'] else 'inside noise'}")
     if null:
         print(f"null 5-95%: [{null['p05']:+.3f}, {null['p95']:+.3f}]  "
               f"-> {'BEATS NOISE' if passes else 'inside noise'}")
