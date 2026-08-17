@@ -1,9 +1,9 @@
 # HHBarrelZone calibration
 
-Window **2026-03-26 .. 2026-08-09**, split at **2026-06-14** (first 60% of game dates trains, last 40% reports).
+Window **2026-03-26 .. 2026-08-16**, split at **2026-06-18** (first 60% of game dates trains, last 40% reports).
 
-- matchups **31,490** · PA **76,678** · HR **2,462** · base HR/PA **3.21%**
-- confident rows (bat in-zone BBE ≥ 80, pitcher in-zone pitches ≥ 150): **14,061**
+- matchups **33,150** · PA **80,810** · HR **2,598** · base HR/PA **3.21%**
+- confident rows (bat in-zone BBE ≥ 80, pitcher in-zone pitches ≥ 150): **15,411**
 
 ## 1. Does Zone Fit add anything to barrel rate?
 
@@ -13,11 +13,11 @@ Lift = (HR/PA in the top Zone Fit bin) − (bottom bin), measured *within* barre
 
 |   k |   train_lift |
 |----:|-------------:|
-|  10 |        0.239 |
-|  25 |        0.251 |
-|  50 |        0.079 |
-| 100 |        0.085 |
-| 200 |        0.041 |
+|  10 |        0.341 |
+|  25 |        0.413 |
+|  50 |        0.137 |
+| 100 |        0.079 |
+| 200 |        0.019 |
 
 Chosen **k = 25**.
 
@@ -25,15 +25,15 @@ Chosen **k = 25**.
 
 |   stratum |   brl_lo |   brl_hi |   pa |   hrpa_zf_low |   hrpa_zf_high |   lift |
 |----------:|---------:|---------:|-----:|--------------:|---------------:|-------:|
-|         0 |    0.179 |    2.488 | 4384 |         2.612 |          3.003 |  0.392 |
-|         1 |    2.489 |    3.627 | 4502 |         2.785 |          3.571 |  0.786 |
-|         2 |    3.628 |    4.703 | 4654 |         2.382 |          3.284 |  0.901 |
-|         3 |    4.703 |    6.154 | 4643 |         4.592 |          4.852 |  0.261 |
-|         4 |    6.156 |   15.044 | 4870 |         3.772 |          4.856 |  1.083 |
+|         0 |    0.168 |    2.449 | 4774 |         2.65  |          2.816 |  0.166 |
+|         1 |    2.45  |    3.598 | 4895 |         2.959 |          3.315 |  0.356 |
+|         2 |    3.599 |    4.681 | 5018 |         2.506 |          3.297 |  0.791 |
+|         3 |    4.682 |    6.108 | 5040 |         4.401 |          4.811 |  0.41  |
+|         4 |    6.111 |   15.044 | 5280 |         3.588 |          4.594 |  1.007 |
 
-Pooled test lift: **+0.691 pp**
+Pooled test lift: **+0.555 pp**
 
-Permutation null (200 seeded shuffles within stratum): mean +0.002, 5-95% band **[-0.441, +0.447]** pp.
+Permutation null (200 seeded shuffles within stratum): mean -0.014, 5-95% band **[-0.498, +0.471]** pp.
 
 **Measured lift clears the noise band.** Zone Fit carries marginal information at k=25.
 
@@ -41,7 +41,7 @@ Permutation null (200 seeded shuffles within stratum): mean +0.002, 5-95% band *
 
 |    p10 |    p25 |    p50 |     p75 |     p90 |
 |-------:|-------:|-------:|--------:|--------:|
-| 93.847 | 97.035 | 99.891 | 102.655 | 105.584 |
+| 93.766 | 97.022 | 99.877 | 102.631 | 105.524 |
 
 Use these percentiles for the board's colour bands instead of hand-picked 95/105/115 cutpoints.
 
@@ -53,44 +53,44 @@ Use these percentiles for the board's colour bands instead of hand-picked 95/105
 
 |   threshold |   hrpa_pass |   hrpa_fail |    edge |   pa_kept_pct |   n_pass |
 |------------:|------------:|------------:|--------:|--------------:|---------:|
-|          34 |       5.272 |       3.35  |   1.922 |         3.341 |      438 |
-|          36 |       5.314 |       3.392 |   1.922 |         1.158 |      150 |
-|          38 |       6.25  |       3.405 |   2.845 |         0.313 |       41 |
-|          40 |       8.108 |       3.409 |   4.699 |         0.103 |       14 |
-|          42 |      33.333 |       3.411 |  29.922 |         0.008 |        1 |
-|          44 |     nan     |       3.414 | nan     |         0     |        0 |
-|          46 |     nan     |       3.414 | nan     |         0     |        0 |
+|          34 |       5.276 |       3.335 |   1.941 |         3.195 |      457 |
+|          36 |       5.201 |       3.377 |   1.824 |         1.08  |      153 |
+|          38 |       6.25  |       3.389 |   2.861 |         0.286 |       41 |
+|          40 |       8.108 |       3.392 |   4.716 |         0.095 |       14 |
+|          42 |      33.333 |       3.395 |  29.939 |         0.008 |        1 |
+|          44 |     nan     |       3.397 | nan     |         0     |        0 |
+|          46 |     nan     |       3.397 | nan     |         0     |        0 |
 
 ### Barrel%
 
 |   threshold |   hrpa_pass |   hrpa_fail |    edge |   pa_kept_pct |   n_pass |
 |------------:|------------:|------------:|--------:|--------------:|---------:|
-|           6 |       4.617 |       3.033 |   1.584 |        24.04  |     3227 |
-|           8 |       5.506 |       3.238 |   2.268 |         7.77  |     1022 |
-|          10 |       6.279 |       3.361 |   2.918 |         1.826 |      238 |
-|          12 |       7.558 |       3.394 |   4.164 |         0.481 |       62 |
-|          14 |       8.333 |       3.411 |   4.923 |         0.067 |        9 |
-|          16 |     nan     |       3.414 | nan     |         0     |        0 |
+|           6 |       4.554 |       3.037 |   1.517 |        23.722 |     3486 |
+|           8 |       5.312 |       3.244 |   2.068 |         7.404 |     1065 |
+|          10 |       6.083 |       3.35  |   2.733 |         1.721 |      246 |
+|          12 |       7.558 |       3.379 |   4.18  |         0.439 |       62 |
+|          14 |       8.333 |       3.394 |   4.939 |         0.061 |        9 |
+|          16 |     nan     |       3.397 | nan     |         0     |        0 |
 
 ## 1b. Does SP-target-barrel add anything to barrel rate?
 
 Same test as Zone Fit: lift of the top vs bottom SP-target bin, within barrel strata, PA-weighted. The feature is the hitter's barrel rate on this starter's vulnerable pitches (usage × barrel-allowed), as a tilt off his own barrel base.
 
-Confident rows (batter arsenal BBE ≥ 80, coverage ≥ 40%): **22,726** · shrink batter k=60, pitcher k=40.
+Confident rows (batter arsenal BBE ≥ 80, coverage ≥ 40%): **24,247** · shrink batter k=60, pitcher k=40.
 
 |   stratum |   brl_lo |   brl_hi |   pa |   hrpa_zf_low |   hrpa_zf_high |   lift |
 |----------:|---------:|---------:|-----:|--------------:|---------------:|-------:|
-|         0 |    0     |    2.4   | 5176 |         2.111 |          2.358 |  0.248 |
-|         1 |    2.402 |    3.599 | 5362 |         3.289 |          2.535 | -0.754 |
-|         2 |    3.6   |    4.696 | 5502 |         2.31  |          2.761 |  0.451 |
-|         3 |    4.697 |    6.144 | 5494 |         3.998 |          4.284 |  0.286 |
-|         4 |    6.145 |   15.044 | 5761 |         4.063 |          4.881 |  0.817 |
+|         0 |    0     |    2.362 | 5544 |         1.745 |          2.557 |  0.812 |
+|         1 |    2.364 |    3.556 | 5719 |         3.148 |          2.901 | -0.247 |
+|         2 |    3.557 |    4.659 | 5843 |         2.372 |          3.032 |  0.659 |
+|         3 |    4.66  |    6.1   | 5874 |         4.058 |          4.317 |  0.259 |
+|         4 |    6.101 |   15.044 | 6148 |         3.878 |          4.741 |  0.863 |
 
-Train lift **+0.286 pp** · pooled test lift **+0.220 pp**.
+Train lift **+0.404 pp** · pooled test lift **+0.473 pp**.
 
-Permutation null (200 seeded shuffles): 5-95% band **[-0.468, +0.483]** pp.
+Permutation null (200 seeded shuffles): 5-95% band **[-0.443, +0.365]** pp.
 
-**Inside the noise band.** On this sample the SP-target read is not distinguishable from a shuffled column — the screener is useful for finding candidates, but the specific number does not beat barrel rate and should not move a price.
+**Clears the noise band** — SP-target-barrel carries HR signal beyond barrel rate. This is the one that could earn a weight; watch it hold across weekly recalibrations before you trust it.
 
 ---
 
